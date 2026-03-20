@@ -1,0 +1,108 @@
+package mapbox
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+)
+
+const defaultBaseURL = "https://api.mapbox.com"
+
+// Client is an HTTP client for the Mapbox API.
+type Client struct {
+	HTTPClient  *http.Client
+	BaseURL     string
+	AccessToken string
+	Username    string
+}
+
+// NewClient creates a new Mapbox API client.
+func NewClient(accessToken, username string) *Client {
+	return &Client{
+		HTTPClient:  http.DefaultClient,
+		BaseURL:     defaultBaseURL,
+		AccessToken: accessToken,
+		Username:    username,
+	}
+}
+
+// doRequest executes an authenticated HTTP request against the Mapbox API.
+func (c *Client) doRequest(ctx context.Context, method, path string, body any) ([]byte, error) {
+	u, err := url.Parse(c.BaseURL + path)
+	if err != nil {
+		return nil, fmt.Errorf("parsing URL: %w", err)
+	}
+
+	q := u.Query()
+	q.Set("access_token", c.AccessToken)
+	u.RawQuery = q.Encode()
+
+	var reqBody io.Reader
+	if body != nil {
+		jsonBody, err := json.Marshal(body)
+		if err != nil {
+			return nil, fmt.Errorf("marshaling request body: %w", err)
+		}
+		reqBody = bytes.NewReader(jsonBody)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, u.String(), reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("executing request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
+	}
+
+	if err := checkResponse(resp.StatusCode, respBody); err != nil {
+		return nil, err
+	}
+
+	return respBody, nil
+}
+
+// doRequestNoContent executes an authenticated HTTP request that expects no response body.
+func (c *Client) doRequestNoContent(ctx context.Context, method, path string) error {
+	u, err := url.Parse(c.BaseURL + path)
+	if err != nil {
+		return fmt.Errorf("parsing URL: %w", err)
+	}
+
+	q := u.Query()
+	q.Set("access_token", c.AccessToken)
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, method, u.String(), nil)
+	if err != nil {
+		return fmt.Errorf("creating request: %w", err)
+	}
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("executing request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("reading response body: %w", err)
+	}
+
+	return checkResponse(resp.StatusCode, respBody)
+}

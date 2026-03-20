@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"os"
+	"strings"
 
 	"github.com/birotaio/terraform-provider-mapbox/internal/datasources"
 	"github.com/birotaio/terraform-provider-mapbox/internal/mapbox"
@@ -25,6 +26,7 @@ type MapboxProvider struct {
 type MapboxProviderModel struct {
 	AccessToken types.String `tfsdk:"access_token"`
 	Username    types.String `tfsdk:"username"`
+	Fresh       types.Bool   `tfsdk:"fresh"`
 }
 
 func (p *MapboxProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -46,6 +48,11 @@ func (p *MapboxProvider) Schema(ctx context.Context, req provider.SchemaRequest,
 			"username": schema.StringAttribute{
 				MarkdownDescription: "Mapbox account username. " +
 					"Can also be set with the `MAPBOX_USERNAME` environment variable.",
+				Optional: true,
+			},
+			"fresh": schema.BoolAttribute{
+				MarkdownDescription: "Whether to use fresh data from the Mapbox API. " +
+					"Can also be set with the `MAPBOX_FRESH` environment variable.",
 				Optional: true,
 			},
 		},
@@ -84,11 +91,19 @@ func (p *MapboxProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		)
 	}
 
+	fresh := true
+	if !data.Fresh.IsNull() && !data.Fresh.IsUnknown() {
+		fresh = data.Fresh.ValueBool()
+	}
+	if envFresh := os.Getenv("MAPBOX_FRESH"); envFresh != "" {
+		fresh = strings.ToLower(envFresh) == "true"
+	}
+
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	client := mapbox.NewClient(accessToken, username)
+	client := mapbox.NewClient(accessToken, username, fresh)
 	resp.DataSourceData = client
 	resp.ResourceData = client
 }

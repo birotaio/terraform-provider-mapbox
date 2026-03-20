@@ -32,8 +32,8 @@ type CreateStyleRequest struct {
 	Metadata   json.RawMessage `json:"metadata,omitempty"`
 	Sources    json.RawMessage `json:"sources"`
 	Layers     json.RawMessage `json:"layers"`
-	Glyphs     string          `json:"glyphs,omitempty"`
 	Visibility string          `json:"visibility,omitempty"`
+	Protected  bool            `json:"protected,omitempty"`
 }
 
 // UpdateStyleRequest is the payload for updating an existing style.
@@ -44,7 +44,6 @@ type UpdateStyleRequest struct {
 	Sources    json.RawMessage `json:"sources"`
 	Layers     json.RawMessage `json:"layers"`
 	Sprite     string          `json:"sprite,omitempty"`
-	Glyphs     string          `json:"glyphs,omitempty"`
 	Owner      string          `json:"owner,omitempty"`
 	Visibility string          `json:"visibility,omitempty"`
 }
@@ -104,4 +103,20 @@ func (c *Client) UpdateStyle(ctx context.Context, styleID string, req UpdateStyl
 func (c *Client) DeleteStyle(ctx context.Context, styleID string) error {
 	path := fmt.Sprintf("/styles/v1/%s/%s", c.Username, styleID)
 	return c.doRequestNoContent(ctx, http.MethodDelete, path)
+}
+
+func (c *Client) SetStyleProtected(ctx context.Context, styleID string, protected bool) error {
+	path := fmt.Sprintf("/styles/v1/%s/%s/protected", c.Username, styleID)
+
+	body := "false"
+	if protected {
+		body = "true"
+	}
+
+	_, err := c.doRequestRawText(ctx, http.MethodPut, path, body)
+	if err != nil {
+		return fmt.Errorf("setting style protected: %w", err)
+	}
+
+	return nil
 }

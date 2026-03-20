@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -37,7 +38,6 @@ type TokenResourceModel struct {
 	Usage       types.String `tfsdk:"usage"`
 	Default     types.Bool   `tfsdk:"default"`
 	Created     types.String `tfsdk:"created"`
-	Modified    types.String `tfsdk:"modified"`
 }
 
 func (r *TokenResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -81,18 +81,23 @@ func (r *TokenResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 			"usage": schema.StringAttribute{
 				MarkdownDescription: "The token type: `pk` (public) or `sk` (secret).",
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"default": schema.BoolAttribute{
 				MarkdownDescription: "Whether this is the default token for the account.",
 				Computed:            true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"created": schema.StringAttribute{
 				MarkdownDescription: "The ISO 8601 timestamp when the token was created.",
 				Computed:            true,
-			},
-			"modified": schema.StringAttribute{
-				MarkdownDescription: "The ISO 8601 timestamp when the token was last modified.",
-				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}
@@ -259,7 +264,6 @@ func mapTokenToState(ctx context.Context, token *mapbox.Token, data *TokenResour
 	data.Usage = types.StringValue(token.Usage)
 	data.Default = types.BoolValue(token.Default)
 	data.Created = types.StringValue(token.Created)
-	data.Modified = types.StringValue(token.Modified)
 
 	if token.TokenString != "" {
 		data.Token = types.StringValue(token.TokenString)

@@ -3,8 +3,11 @@ package mapbox
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Token represents a Mapbox access token.
@@ -41,6 +44,11 @@ func (c *Client) ListTokens(ctx context.Context) ([]Token, error) {
 
 	body, err := c.doRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
+		apiErr := &APIError{}
+		if errors.As(err, &apiErr) && apiErr.IsNotFound() {
+			tflog.Trace(ctx, "route returned 404 Not Found, treating as empty token list. Maybe the provider's token doesn't have permissions to list tokens")
+			return []Token{}, nil // No tokens found, return empty slice
+		}
 		return nil, fmt.Errorf("listing tokens: %w", err)
 	}
 
